@@ -4,7 +4,7 @@
     package="it.drawit.streckbryggan">
 
     <application
-        android:name="com.izettle.payments.android.streckbryggan.MainApplication"
+        android:name="it.drawit.streckbryggan.MainApplication"
         android:allowBackup="true"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
@@ -14,7 +14,7 @@
         android:theme="@style/AppTheme"
         tools:replace="android:fullBackupContent">
 
-        <activity android:name="com.izettle.payments.android.streckbryggan.MainActivity">
+        <activity android:name="it.drawit.streckbryggan.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
