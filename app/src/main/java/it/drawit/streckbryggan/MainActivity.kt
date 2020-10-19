@@ -2,11 +2,18 @@ package it.drawit.streckbryggan
 
 import android.annotation.SuppressLint
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.widget.*
+import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
+import com.github.kittinunf.fuel.core.FuelError
+import com.github.kittinunf.result.Result
 import com.izettle.android.commons.ext.state.toLiveData
 import com.izettle.payments.android.payment.TransactionReference
 import com.izettle.payments.android.payment.refunds.CardPaymentPayload
@@ -21,6 +28,7 @@ import com.izettle.payments.android.ui.payment.CardPaymentResult
 import com.izettle.payments.android.ui.readers.CardReadersActivity
 import com.izettle.payments.android.ui.refunds.RefundResult
 import com.izettle.payments.android.ui.refunds.RefundsActivity
+import java.time.Duration
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -31,12 +39,16 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chargeButton: Button
     private lateinit var refundButton: Button
     private lateinit var settingsButton: Button
+    private lateinit var pollStatusTextBox: TextView
+    private lateinit var enablePollingCheckBox: CheckBox
+    private lateinit var pollProgressBar: ProgressBar
     private lateinit var amountEditText: EditText
     private lateinit var tippingCheckBox: CheckBox
     private lateinit var installmentsCheckBox: CheckBox
     private lateinit var loginCheckBox: CheckBox
     private lateinit var lastPaymentTraceId: MutableLiveData<String?>
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -46,6 +58,9 @@ class MainActivity : AppCompatActivity() {
         chargeButton = findViewById(R.id.charge_btn)
         refundButton = findViewById(R.id.refund_btn)
         settingsButton = findViewById(R.id.settings_btn)
+        pollStatusTextBox = findViewById(R.id.pollStatusTextBox)
+        enablePollingCheckBox = findViewById(R.id.enablePollingCheckBox)
+        pollProgressBar = findViewById(R.id.pollProgressBar)
         amountEditText = findViewById(R.id.amount_input)
         tippingCheckBox = findViewById(R.id.tipping_check_box)
         loginCheckBox = findViewById(R.id.login_check_box)
@@ -65,28 +80,49 @@ class MainActivity : AppCompatActivity() {
         chargeButton.setOnClickListener { onChargeClicked() }
         refundButton.setOnClickListener { onRefundClicked() }
         settingsButton.setOnClickListener { onSettingsClicked() }
+        enablePollingCheckBox.setOnClickListener { onPollingCheckBoxClicked() }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_PAYMENT && data != null) {
-            val result: CardPaymentResult? = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)
-            if (result is CardPaymentResult.Completed) {
-                Toast.makeText(this, "Payment completed", Toast.LENGTH_SHORT).show()
-            } else if (result is CardPaymentResult.Canceled) {
-                Toast.makeText(this, "Payment canceled", Toast.LENGTH_SHORT).show()
-            } else if (result is CardPaymentResult.Failed) {
-                Toast.makeText(this, "Payment failed ", Toast.LENGTH_SHORT).show()
+            val result: CardPaymentResult = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
+            postTransactionResult(result) { response ->
+                runOnUiThread {
+                    when (response) {
+                        is Result.Success -> {
+                            pollStatusTextBox.text = response.value
+                        }
+                        is Result.Failure -> {
+                            pollStatusTextBox.text = "Error: ${response.error}"
+                        }
+                    }
+                }
+            }
+            when (result) {
+                is CardPaymentResult.Completed -> {
+                    Toast.makeText(this, "Payment completed", Toast.LENGTH_SHORT).show()
+                }
+                is CardPaymentResult.Canceled -> {
+                    Toast.makeText(this, "Payment canceled", Toast.LENGTH_SHORT).show()
+                }
+                is CardPaymentResult.Failed -> {
+                    Toast.makeText(this, "Payment failed ", Toast.LENGTH_SHORT).show()
+                }
             }
         }
         if (requestCode == REQUEST_CODE_REFUND && data != null) {
             val result: RefundResult? = data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)
-            if (result is RefundResult.Completed) {
-                Toast.makeText(this, "Refund completed", Toast.LENGTH_SHORT).show()
-            } else if (result is RefundResult.Canceled) {
-                Toast.makeText(this, "Refund canceled", Toast.LENGTH_SHORT).show()
-            } else if (result is RefundResult.Failed) {
-                Toast.makeText(this, "Refund failed ", Toast.LENGTH_SHORT).show()
+            when (result) {
+                is RefundResult.Completed -> {
+                    Toast.makeText(this, "Refund completed", Toast.LENGTH_SHORT).show()
+                }
+                is RefundResult.Canceled -> {
+                    Toast.makeText(this, "Refund canceled", Toast.LENGTH_SHORT).show()
+                }
+                is RefundResult.Failed -> {
+                    Toast.makeText(this, "Refund failed ", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -139,6 +175,60 @@ class MainActivity : AppCompatActivity() {
     private fun onRefundClicked() {
         val internalTraceId = lastPaymentTraceId.value ?: return
         refundsManager.retrieveCardPayment(internalTraceId, RefundCallback())
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun onPollingCheckBoxClicked() {
+        if (enablePollingCheckBox.isChecked) {
+            pollProgressBar.visibility = View.VISIBLE
+            pollStatusTextBox.text = "Polling for transaction"
+            pollProgressBar.setProgress(0, true);
+
+            var workManager = WorkManager.getInstance()
+            val workRequest = PeriodicWorkRequestBuilder<PollWorker>(Duration.ofSeconds(5))
+                    .build()
+            workManager.enqueue(workRequest)
+
+            pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
+                result.fold(
+                        success = {
+                            when (it) {
+                                is TransactionPollResponse.Pending -> runOnUiThread {
+                                    //val internalTraceId = UUID.randomUUID().toString()
+                                    val enableTipping = false
+                                    val enableInstallments = false
+                                    val enableLogin = false
+                                    val reference = TransactionReference.Builder(it.reference)
+                                            .put("PAYMENT_EXTRA_INFO", "Started from home screen")
+                                            .build()
+
+                                    pollStatusTextBox.text = """Starting transaction ${it.reference} for ${it.amount} kr"""
+                                    pollProgressBar.setProgress(10, true);
+
+                                    val intent = CardPaymentActivity.IntentBuilder(this)
+                                            .amount(it.amount)
+                                            .reference(reference)
+                                            .enableTipping(enableTipping) // Only for markets with tipping support
+                                            .enableInstalments(enableInstallments) // Only for markets with installments support
+                                            .enableLogin(enableLogin) // Mandatory to set
+                                            .build()
+
+                                    startActivityForResult(intent, REQUEST_CODE_PAYMENT)
+                                    lastPaymentTraceId.value = it.reference
+                                }
+                                is TransactionPollResponse.NoPending -> {
+                                    pollStatusTextBox.text = """No transaction waiting"""
+                                }
+                            }
+                        }, failure = {
+                    pollStatusTextBox.text = "ERROR: \"$it\"\n--------\n${it.message}"
+                }
+                )
+            }
+        } else {
+            pollStatusTextBox.text = "Sleep mode..."
+            pollProgressBar.visibility = View.INVISIBLE
+        }
     }
 
     private inner class RefundCallback : RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {

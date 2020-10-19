@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     package="it.drawit.streckbryggan">
 
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:name="it.drawit.streckbryggan.MainApplication"
         android:allowBackup="true"
