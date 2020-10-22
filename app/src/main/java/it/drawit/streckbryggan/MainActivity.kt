@@ -32,9 +32,6 @@ import com.izettle.payments.android.ui.refunds.RefundResult
 import com.izettle.payments.android.ui.refunds.RefundsActivity
 import java.util.*
 
-const val POLL_NOTIFICATION_ID = 1
-const val NOTIFICATION_CHANNEL_ID = "streckbryggan-notification-channel"
-
 class MainActivity : AppCompatActivity() {
 
     private lateinit var pollStatusText: TextView
@@ -99,11 +96,6 @@ class MainActivity : AppCompatActivity() {
         refundButton.setOnClickListener { onRefundClicked() }
         settingsButton.setOnClickListener { onSettingsClicked() }
         enablePollingCheckBox.setOnClickListener { onPollingCheckBoxClicked() }
-
-        // Initialize notification channel
-        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationChannel = NotificationChannel(NOTIFICATION_CHANNEL_ID, "StreckBryggan", NotificationManager.IMPORTANCE_HIGH)
-        notificationManager.createNotificationChannel(notificationChannel)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -259,22 +251,10 @@ class MainActivity : AppCompatActivity() {
             pollProgressBar.visibility = View.VISIBLE
             pollStatusText.text = "Polling for transaction"
 
-            val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-            val notification = NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
-                    .setContentTitle("StreckBryggan")
-                    .setContentText("Listening for transactions...")
-                    .setSmallIcon(R.mipmap.ic_launcher)
-                    .setOngoing(true)
-                    .build()
-
-            notificationManager.notify(POLL_NOTIFICATION_ID, notification)
             poll()
         } else {
             pollProgressBar.visibility = View.INVISIBLE
             pollStatusText.text = "Waiting"
-            val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.cancel(POLL_NOTIFICATION_ID)
         }
     }
 
