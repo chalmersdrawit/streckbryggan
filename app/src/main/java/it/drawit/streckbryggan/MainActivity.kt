@@ -1,9 +1,6 @@
 package it.drawit.streckbryggan
 
 import android.annotation.SuppressLint
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -11,7 +8,6 @@ import android.view.View
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.NotificationCompat
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import com.github.kittinunf.fuel.core.FuelError
@@ -73,9 +69,9 @@ class MainActivity : AppCompatActivity() {
         installmentsCheckBox = findViewById(R.id.installments_check_box)
         lastPaymentTraceId = MutableLiveData(null)
 
-        val strecklistanBaseUri = getString(R.string.strecklistan_base_uri);
-        val strecklistanUser = getString(R.string.strecklistan_http_user);
-        val strecklistanPass = getString(R.string.strecklistan_http_pass);
+        val strecklistanBaseUri = getString(R.string.strecklistan_base_uri)
+        val strecklistanUser = getString(R.string.strecklistan_http_user)
+        val strecklistanPass = getString(R.string.strecklistan_http_pass)
         connection = StrecklistanConnection(
                 strecklistanBaseUri,
                 strecklistanUser,
@@ -107,7 +103,7 @@ class MainActivity : AppCompatActivity() {
                     when (response) {
                         is Result.Success -> {
                             pollStatusText.text = response.value
-                            if(enablePollingCheckBox.isChecked) {
+                            if (enablePollingCheckBox.isChecked) {
                                 poll()
                             }
                         }
@@ -201,37 +197,39 @@ class MainActivity : AppCompatActivity() {
         connection.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
             result.fold(
                     success = {
-                        if (enablePollingCheckBox.isChecked) {
-                            when (it) {
-                                is TransactionPollResponse.Pending -> runOnUiThread {
-                                    //val internalTraceId = UUID.randomUUID().toString()
-                                    val enableTipping = false
-                                    val enableInstallments = false
-                                    val enableLogin = false
-                                    val reference = TransactionReference.Builder(it.id.toString())
-                                            .put("PAYMENT_EXTRA_INFO", "Started from home screen")
-                                            .build()
+                        runOnUiThread {
+                            if (enablePollingCheckBox.isChecked) {
+                                when (it) {
+                                    is TransactionPollResponse.Pending -> {
+                                        //val internalTraceId = UUID.randomUUID().toString()
+                                        val enableTipping = false
+                                        val enableInstallments = false
+                                        val enableLogin = false
+                                        val reference = TransactionReference.Builder(it.id.toString())
+                                                .put("PAYMENT_EXTRA_INFO", "Started from home screen")
+                                                .build()
 
-                                    pollStatusText.text = """Starting transaction ${it.id} for ${it.amount} kr"""
+                                        pollStatusText.text = """Starting transaction ${it.id} for ${it.amount} kr"""
 
-                                    val intent = CardPaymentActivity.IntentBuilder(this)
-                                            .amount(it.amount)
-                                            .reference(reference)
-                                            .enableTipping(enableTipping) // Only for markets with tipping support
-                                            .enableInstalments(enableInstallments) // Only for markets with installments support
-                                            .enableLogin(enableLogin) // Mandatory to set
-                                            .build()
+                                        val intent = CardPaymentActivity.IntentBuilder(this)
+                                                .amount(it.amount)
+                                                .reference(reference)
+                                                .enableTipping(enableTipping) // Only for markets with tipping support
+                                                .enableInstalments(enableInstallments) // Only for markets with installments support
+                                                .enableLogin(enableLogin) // Mandatory to set
+                                                .build()
 
-                                    startActivityForResult(intent, REQUEST_CODE_PAYMENT)
-                                    lastPaymentTraceId.value = it.id.toString()
-                                }
-                                is TransactionPollResponse.NoPending -> runOnUiThread {
-                                    // TODO: Remove this beautifully disgusting piece of code
-                                    val dots = pollStatusText.text.count { c -> c == '.' } + 1
-                                    pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
+                                        startActivityForResult(intent, REQUEST_CODE_PAYMENT)
+                                        lastPaymentTraceId.value = it.id.toString()
+                                    }
+                                    is TransactionPollResponse.NoPending -> {
+                                        // TODO: Remove this beautifully disgusting piece of code
+                                        val dots = pollStatusText.text.count { c -> c == '.' } + 1
+                                        pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
 
-                                    // TODO: make sure we sleep for a bit as to not spam the server
-                                    poll()
+                                        // TODO: make sure we sleep for a bit as to not spam the server
+                                        poll()
+                                    }
                                 }
                             }
                         }
