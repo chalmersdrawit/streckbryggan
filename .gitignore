@@ -1,5 +1,5 @@
 # Application config files
-iZettleSDK.gradle
+secrets.gradle
 
 # Built application files
 *.apk
