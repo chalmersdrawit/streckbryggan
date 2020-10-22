@@ -30,6 +30,9 @@ android {
             it.resValue 'string', 'client_id', iZettleSDK.clientId
             it.resValue 'string', 'redirect_url_scheme', iZettleSDK.redirectUrlScheme
             it.resValue 'string', 'redirect_url_host', iZettleSDK.redirectUrlHost
+            it.resValue 'string', 'strecklistan_base_uri', strecklistan.baseUri
+            it.resValue 'string', 'strecklistan_http_user', strecklistan.basicAuthUser
+            it.resValue 'string', 'strecklistan_http_pass', strecklistan.basicAuthPass
         }
     }
 
@@ -56,6 +59,8 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-process:2.2.0'
     implementation 'com.github.kittinunf.fuel:fuel:2.3.0'
     implementation 'com.github.kittinunf.fuel:fuel-jackson:2.3.0'
+    implementation 'com.github.kittinunf.fuel:fuel-coroutines:2.3.0'
+    implementation 'com.github.kittinunf.fuel:fuel-livedata:2.3.0'
     implementation 'com.fasterxml.jackson.core:jackson-core:2.11.2'
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.11.2'
     implementation 'com.fasterxml.jackson.core:jackson-annotations:2.11.2'

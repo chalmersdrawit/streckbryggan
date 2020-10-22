@@ -1,6 +1,9 @@
 package it.drawit.streckbryggan
 
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -8,10 +11,9 @@ import android.view.View
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.NotificationCompat
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
 import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.result.Result
 import com.izettle.android.commons.ext.state.toLiveData
@@ -28,10 +30,16 @@ import com.izettle.payments.android.ui.payment.CardPaymentResult
 import com.izettle.payments.android.ui.readers.CardReadersActivity
 import com.izettle.payments.android.ui.refunds.RefundResult
 import com.izettle.payments.android.ui.refunds.RefundsActivity
-import java.time.Duration
 import java.util.*
 
+const val POLL_NOTIFICATION_ID = 1
+const val NOTIFICATION_CHANNEL_ID = "streckbryggan-notification-channel"
+
 class MainActivity : AppCompatActivity() {
+
+    private lateinit var pollStatusText: TextView
+    private lateinit var enablePollingCheckBox: CheckBox
+    private lateinit var pollProgressBar: ProgressBar
 
     private lateinit var loginStateText: TextView
     private lateinit var loginButton: Button
@@ -39,33 +47,43 @@ class MainActivity : AppCompatActivity() {
     private lateinit var chargeButton: Button
     private lateinit var refundButton: Button
     private lateinit var settingsButton: Button
-    private lateinit var pollStatusTextBox: TextView
-    private lateinit var enablePollingCheckBox: CheckBox
-    private lateinit var pollProgressBar: ProgressBar
     private lateinit var amountEditText: EditText
     private lateinit var tippingCheckBox: CheckBox
     private lateinit var installmentsCheckBox: CheckBox
     private lateinit var loginCheckBox: CheckBox
     private lateinit var lastPaymentTraceId: MutableLiveData<String?>
 
+    private lateinit var connection: StrecklistanConnection
+
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+        pollStatusText = findViewById(R.id.pollStatusText)
+        enablePollingCheckBox = findViewById(R.id.enablePollingCheckBox)
+        pollProgressBar = findViewById(R.id.pollProgressBar)
+
         loginStateText = findViewById(R.id.login_state)
         loginButton = findViewById(R.id.login_btn)
         logoutButton = findViewById(R.id.logout_btn)
         chargeButton = findViewById(R.id.charge_btn)
         refundButton = findViewById(R.id.refund_btn)
         settingsButton = findViewById(R.id.settings_btn)
-        pollStatusTextBox = findViewById(R.id.pollStatusTextBox)
-        enablePollingCheckBox = findViewById(R.id.enablePollingCheckBox)
-        pollProgressBar = findViewById(R.id.pollProgressBar)
         amountEditText = findViewById(R.id.amount_input)
         tippingCheckBox = findViewById(R.id.tipping_check_box)
         loginCheckBox = findViewById(R.id.login_check_box)
         installmentsCheckBox = findViewById(R.id.installments_check_box)
         lastPaymentTraceId = MutableLiveData(null)
+
+        val strecklistanBaseUri = getString(R.string.strecklistan_base_uri);
+        val strecklistanUser = getString(R.string.strecklistan_http_user);
+        val strecklistanPass = getString(R.string.strecklistan_http_pass);
+        connection = StrecklistanConnection(
+                strecklistanBaseUri,
+                strecklistanUser,
+                strecklistanPass
+        )
 
         user.state.toLiveData().observe(this, Observer { authState: User.AuthState? ->
             onUserAuthStateChanged(authState is LoggedIn)
@@ -81,20 +99,30 @@ class MainActivity : AppCompatActivity() {
         refundButton.setOnClickListener { onRefundClicked() }
         settingsButton.setOnClickListener { onSettingsClicked() }
         enablePollingCheckBox.setOnClickListener { onPollingCheckBoxClicked() }
+
+        // Initialize notification channel
+        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationChannel = NotificationChannel(NOTIFICATION_CHANNEL_ID, "StreckBryggan", NotificationManager.IMPORTANCE_HIGH)
+        notificationManager.createNotificationChannel(notificationChannel)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_PAYMENT && data != null) {
             val result: CardPaymentResult = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
-            postTransactionResult(result) { response ->
+            connection.postTransactionResult(Integer.parseInt(lastPaymentTraceId.value!!), result) { response ->
                 runOnUiThread {
                     when (response) {
                         is Result.Success -> {
-                            pollStatusTextBox.text = response.value
+                            pollStatusText.text = response.value
+                            if(enablePollingCheckBox.isChecked) {
+                                poll()
+                            }
                         }
                         is Result.Failure -> {
-                            pollStatusTextBox.text = "Error: ${response.error}"
+                            enablePollingCheckBox.isChecked = false
+                            pollProgressBar.visibility = View.INVISIBLE
+                            pollStatusText.text = "Error: ${response.error}"
                         }
                     }
                 }
@@ -177,33 +205,22 @@ class MainActivity : AppCompatActivity() {
         refundsManager.retrieveCardPayment(internalTraceId, RefundCallback())
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
-    private fun onPollingCheckBoxClicked() {
-        if (enablePollingCheckBox.isChecked) {
-            pollProgressBar.visibility = View.VISIBLE
-            pollStatusTextBox.text = "Polling for transaction"
-            pollProgressBar.setProgress(0, true);
-
-            var workManager = WorkManager.getInstance()
-            val workRequest = PeriodicWorkRequestBuilder<PollWorker>(Duration.ofSeconds(5))
-                    .build()
-            workManager.enqueue(workRequest)
-
-            pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
-                result.fold(
-                        success = {
+    private fun poll() {
+        connection.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
+            result.fold(
+                    success = {
+                        if (enablePollingCheckBox.isChecked) {
                             when (it) {
                                 is TransactionPollResponse.Pending -> runOnUiThread {
                                     //val internalTraceId = UUID.randomUUID().toString()
                                     val enableTipping = false
                                     val enableInstallments = false
                                     val enableLogin = false
-                                    val reference = TransactionReference.Builder(it.reference)
+                                    val reference = TransactionReference.Builder(it.id.toString())
                                             .put("PAYMENT_EXTRA_INFO", "Started from home screen")
                                             .build()
 
-                                    pollStatusTextBox.text = """Starting transaction ${it.reference} for ${it.amount} kr"""
-                                    pollProgressBar.setProgress(10, true);
+                                    pollStatusText.text = """Starting transaction ${it.id} for ${it.amount} kr"""
 
                                     val intent = CardPaymentActivity.IntentBuilder(this)
                                             .amount(it.amount)
@@ -214,20 +231,50 @@ class MainActivity : AppCompatActivity() {
                                             .build()
 
                                     startActivityForResult(intent, REQUEST_CODE_PAYMENT)
-                                    lastPaymentTraceId.value = it.reference
+                                    lastPaymentTraceId.value = it.id.toString()
                                 }
-                                is TransactionPollResponse.NoPending -> {
-                                    pollStatusTextBox.text = """No transaction waiting"""
+                                is TransactionPollResponse.NoPending -> runOnUiThread {
+                                    // TODO: Remove this beautifully disgusting piece of code
+                                    val dots = pollStatusText.text.count { c -> c == '.' } + 1
+                                    pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
+
+                                    // TODO: make sure we sleep for a bit as to not spam the server
+                                    poll()
                                 }
                             }
-                        }, failure = {
-                    pollStatusTextBox.text = "ERROR: \"$it\"\n--------\n${it.message}"
-                }
-                )
+                        }
+                    }, failure = {
+                enablePollingCheckBox.isChecked = false
+                pollProgressBar.visibility = View.INVISIBLE
+                pollStatusText.text = "Error polling for transaction"
+                //pollStatusTextBox.text = "ERROR: \"$it\"\n--------\n${it.message}"
             }
+            )
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun onPollingCheckBoxClicked() {
+        if (enablePollingCheckBox.isChecked) {
+            pollProgressBar.visibility = View.VISIBLE
+            pollStatusText.text = "Polling for transaction"
+
+            val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+            val notification = NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle("StreckBryggan")
+                    .setContentText("Listening for transactions...")
+                    .setSmallIcon(R.mipmap.ic_launcher)
+                    .setOngoing(true)
+                    .build()
+
+            notificationManager.notify(POLL_NOTIFICATION_ID, notification)
+            poll()
         } else {
-            pollStatusTextBox.text = "Sleep mode..."
             pollProgressBar.visibility = View.INVISIBLE
+            pollStatusText.text = "Waiting"
+            val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(POLL_NOTIFICATION_ID)
         }
     }
 
@@ -256,3 +303,4 @@ class MainActivity : AppCompatActivity() {
         private const val REQUEST_CODE_REFUND = 1002
     }
 }
+
