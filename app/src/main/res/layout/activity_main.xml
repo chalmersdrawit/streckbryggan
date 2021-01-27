@@ -41,6 +41,7 @@
                 android:id="@+id/pollStatusText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:singleLine="true"
                 android:text="Waiting"
                 android:textAllCaps="false"
                 android:textSize="18sp"
