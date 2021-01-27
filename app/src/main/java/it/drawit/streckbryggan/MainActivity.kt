@@ -26,6 +26,10 @@ import com.izettle.payments.android.ui.payment.CardPaymentResult
 import com.izettle.payments.android.ui.readers.CardReadersActivity
 import com.izettle.payments.android.ui.refunds.RefundResult
 import com.izettle.payments.android.ui.refunds.RefundsActivity
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
@@ -47,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var lastPaymentTraceId: MutableLiveData<String?>
 
     private lateinit var connection: StrecklistanConnection
+    private var pollJob: Job? = null
 
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -223,12 +228,17 @@ class MainActivity : AppCompatActivity() {
                                         lastPaymentTraceId.value = it.id.toString()
                                     }
                                     is TransactionPollResponse.NoPending -> {
-                                        // TODO: Remove this beautifully disgusting piece of code
+                                        // Animate ellipsis in a cool-looking way.
+                                        // Must never remove this beautifully disgusting piece of code
                                         val dots = pollStatusText.text.count { c -> c == '.' } + 1
                                         pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
 
-                                        // TODO: make sure we sleep for a bit as to not spam the server
-                                        poll()
+                                        val pollJob = GlobalScope.launch {
+                                            delay(timeMillis = 1000)
+                                            poll()
+                                        }
+                                        pollJob.start()
+                                        this.pollJob = pollJob
                                     }
                                 }
                             }
@@ -251,6 +261,8 @@ class MainActivity : AppCompatActivity() {
 
             poll()
         } else {
+            this.pollJob?.cancel()
+
             pollProgressBar.visibility = View.INVISIBLE
             pollStatusText.text = "Waiting"
         }
