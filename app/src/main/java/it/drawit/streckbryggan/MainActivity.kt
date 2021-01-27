@@ -8,24 +8,17 @@ import android.view.View
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.result.Result
 import com.izettle.android.commons.ext.state.toLiveData
 import com.izettle.payments.android.payment.TransactionReference
-import com.izettle.payments.android.payment.refunds.CardPaymentPayload
-import com.izettle.payments.android.payment.refunds.RefundsManager
-import com.izettle.payments.android.payment.refunds.RetrieveCardPaymentFailureReason
-import com.izettle.payments.android.sdk.IZettleSDK.Instance.refundsManager
 import com.izettle.payments.android.sdk.IZettleSDK.Instance.user
 import com.izettle.payments.android.sdk.User
 import com.izettle.payments.android.sdk.User.AuthState.LoggedIn
 import com.izettle.payments.android.ui.payment.CardPaymentActivity
 import com.izettle.payments.android.ui.payment.CardPaymentResult
 import com.izettle.payments.android.ui.readers.CardReadersActivity
-import com.izettle.payments.android.ui.refunds.RefundResult
-import com.izettle.payments.android.ui.refunds.RefundsActivity
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -35,20 +28,13 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     private lateinit var pollStatusText: TextView
-    private lateinit var enablePollingCheckBox: CheckBox
+    private lateinit var enablePollingButton: ToggleButton
     private lateinit var pollProgressBar: ProgressBar
-
     private lateinit var loginStateText: TextView
     private lateinit var loginButton: Button
     private lateinit var logoutButton: Button
-    private lateinit var chargeButton: Button
-    private lateinit var refundButton: Button
+    private lateinit var advancedButton: Button
     private lateinit var settingsButton: Button
-    private lateinit var amountEditText: EditText
-    private lateinit var tippingCheckBox: CheckBox
-    private lateinit var installmentsCheckBox: CheckBox
-    private lateinit var loginCheckBox: CheckBox
-    private lateinit var lastPaymentTraceId: MutableLiveData<String?>
 
     private lateinit var connection: StrecklistanConnection
     private var pollJob: Job? = null
@@ -58,21 +44,15 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        pollStatusText = findViewById(R.id.pollStatusText)
-        enablePollingCheckBox = findViewById(R.id.enablePollingCheckBox)
-        pollProgressBar = findViewById(R.id.pollProgressBar)
+        pollStatusText = findViewById(R.id.poll_status_text)
+        enablePollingButton = findViewById(R.id.enable_polling_button)
+        pollProgressBar = findViewById(R.id.poll_progress_bar)
 
         loginStateText = findViewById(R.id.login_state)
         loginButton = findViewById(R.id.login_btn)
         logoutButton = findViewById(R.id.logout_btn)
-        chargeButton = findViewById(R.id.charge_btn)
-        refundButton = findViewById(R.id.refund_btn)
+        advancedButton = findViewById(R.id.advanced_button)
         settingsButton = findViewById(R.id.settings_btn)
-        amountEditText = findViewById(R.id.amount_input)
-        tippingCheckBox = findViewById(R.id.tipping_check_box)
-        loginCheckBox = findViewById(R.id.login_check_box)
-        installmentsCheckBox = findViewById(R.id.installments_check_box)
-        lastPaymentTraceId = MutableLiveData(null)
 
         val strecklistanBaseUri = getString(R.string.strecklistan_base_uri)
         val strecklistanUser = getString(R.string.strecklistan_http_user)
@@ -87,16 +67,11 @@ class MainActivity : AppCompatActivity() {
             onUserAuthStateChanged(authState is LoggedIn)
         })
 
-        lastPaymentTraceId.observe(this, Observer { value: String? ->
-            refundButton.isEnabled = value != null
-        })
-
         loginButton.setOnClickListener { onLoginClicked() }
         logoutButton.setOnClickListener { onLogoutClicked() }
-        chargeButton.setOnClickListener { onChargeClicked() }
-        refundButton.setOnClickListener { onRefundClicked() }
+        advancedButton.setOnClickListener { onAdvancedClicked() }
         settingsButton.setOnClickListener { onSettingsClicked() }
-        enablePollingCheckBox.setOnClickListener { onPollingCheckBoxClicked() }
+        enablePollingButton.setOnClickListener { onPollingCheckBoxClicked() }
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -108,12 +83,12 @@ class MainActivity : AppCompatActivity() {
                     when (response) {
                         is Result.Success -> {
                             pollStatusText.text = response.value
-                            if (enablePollingCheckBox.isChecked) {
+                            if (enablePollingButton.isChecked) {
                                 poll()
                             }
                         }
                         is Result.Failure -> {
-                            enablePollingCheckBox.isChecked = false
+                            enablePollingButton.isChecked = false
                             pollProgressBar.visibility = View.INVISIBLE
                             pollStatusText.text = "Error: ${response.error}"
                         }
@@ -131,20 +106,8 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Payment failed ", Toast.LENGTH_SHORT).show()
                 }
             }
-        }
-        if (requestCode == REQUEST_CODE_REFUND && data != null) {
-            val result: RefundResult? = data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)
-            when (result) {
-                is RefundResult.Completed -> {
-                    Toast.makeText(this, "Refund completed", Toast.LENGTH_SHORT).show()
-                }
-                is RefundResult.Canceled -> {
-                    Toast.makeText(this, "Refund canceled", Toast.LENGTH_SHORT).show()
-                }
-                is RefundResult.Failed -> {
-                    Toast.makeText(this, "Refund failed ", Toast.LENGTH_SHORT).show()
-                }
-            }
+        } else {
+            Toast.makeText(this, "ERROR: Unknown request code: $requestCode", Toast.LENGTH_LONG).show()
         }
     }
 
@@ -163,39 +126,12 @@ class MainActivity : AppCompatActivity() {
         user.logout()
     }
 
-    private fun onChargeClicked() {
-        val amountEditTextContent = amountEditText.text.toString()
-        if (amountEditTextContent == "") {
-            return
-        }
-        val internalTraceId = UUID.randomUUID().toString()
-        val amount = amountEditTextContent.toLong()
-        val enableTipping = tippingCheckBox.isChecked
-        val enableInstallments = installmentsCheckBox.isChecked
-        val enableLogin = loginCheckBox.isChecked
-        val reference = TransactionReference.Builder(internalTraceId)
-                .put("PAYMENT_EXTRA_INFO", "Started from home screen")
-                .build()
-
-        val intent = CardPaymentActivity.IntentBuilder(this)
-                .amount(amount)
-                .reference(reference)
-                .enableTipping(enableTipping) // Only for markets with tipping support
-                .enableInstalments(enableInstallments) // Only for markets with installments support
-                .enableLogin(enableLogin) // Mandatory to set
-                .build()
-
-        startActivityForResult(intent, REQUEST_CODE_PAYMENT)
-        lastPaymentTraceId.value = internalTraceId
+    private fun onAdvancedClicked() {
+        startActivity(Intent(this, AdvancedActivity::class.java))
     }
 
     private fun onSettingsClicked() {
         startActivity(CardReadersActivity.newIntent(this))
-    }
-
-    private fun onRefundClicked() {
-        val internalTraceId = lastPaymentTraceId.value ?: return
-        refundsManager.retrieveCardPayment(internalTraceId, RefundCallback())
     }
 
     private fun poll() {
@@ -203,7 +139,7 @@ class MainActivity : AppCompatActivity() {
             result.fold(
                     success = {
                         runOnUiThread {
-                            if (enablePollingCheckBox.isChecked) {
+                            if (enablePollingButton.isChecked) {
                                 when (it) {
                                     is TransactionPollResponse.Pending -> {
                                         //val internalTraceId = UUID.randomUUID().toString()
@@ -244,10 +180,9 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     }, failure = {
-                enablePollingCheckBox.isChecked = false
+                enablePollingButton.isChecked = false
                 pollProgressBar.visibility = View.INVISIBLE
                 pollStatusText.text = "Error polling for transaction"
-                //pollStatusTextBox.text = "ERROR: \"$it\"\n--------\n${it.message}"
             }
             )
         }
@@ -255,7 +190,7 @@ class MainActivity : AppCompatActivity() {
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun onPollingCheckBoxClicked() {
-        if (enablePollingCheckBox.isChecked) {
+        if (enablePollingButton.isChecked) {
             pollProgressBar.visibility = View.VISIBLE
             pollStatusText.text = "Polling for transaction"
 
@@ -264,33 +199,12 @@ class MainActivity : AppCompatActivity() {
             this.pollJob?.cancel()
 
             pollProgressBar.visibility = View.INVISIBLE
-            pollStatusText.text = "Waiting"
-        }
-    }
-
-    private inner class RefundCallback : RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {
-
-        override fun onFailure(reason: RetrieveCardPaymentFailureReason) {
-            Toast.makeText(this@MainActivity, "Refund failed", Toast.LENGTH_SHORT).show()
-        }
-
-        override fun onSuccess(payload: CardPaymentPayload) {
-            val reference = TransactionReference.Builder(payload.referenceId)
-                    .put("REFUND_EXTRA_INFO", "Started from home screen")
-                    .build()
-            val intent = RefundsActivity.IntentBuilder(this@MainActivity)
-                    .cardPayment(payload)
-                    .receiptNumber("#123456")
-                    .taxAmount(payload.amount / 10)
-                    .reference(reference)
-                    .build()
-            startActivityForResult(intent, REQUEST_CODE_REFUND)
+            pollStatusText.text = "Idle"
         }
     }
 
     companion object {
         private const val REQUEST_CODE_PAYMENT = 1001
-        private const val REQUEST_CODE_REFUND = 1002
     }
 }
 

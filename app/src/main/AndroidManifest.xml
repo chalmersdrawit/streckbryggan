@@ -25,6 +25,15 @@
         </activity>
 
         <activity
+            android:name="it.drawit.streckbryggan.AdvancedActivity"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name="com.izettle.android.auth.OAuthActivity"
             android:launchMode="singleTask"
             android:taskAffinity="@string/oauth_activity_task_affinity">
