@@ -1,6 +1,5 @@
 package it.drawit.streckbryggan
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -74,13 +73,13 @@ class AdvancedActivity : AppCompatActivity() {
             val result: CardPaymentResult = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
             when (result) {
                 is CardPaymentResult.Completed -> {
-                    Toast.makeText(this, "Payment completed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_completed), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Canceled -> {
-                    Toast.makeText(this, "Payment canceled", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_canceled), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Failed -> {
-                    Toast.makeText(this, "Payment failed ", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -88,21 +87,20 @@ class AdvancedActivity : AppCompatActivity() {
             val result: RefundResult? = data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)
             when (result) {
                 is RefundResult.Completed -> {
-                    Toast.makeText(this, "Refund completed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_refund_completed), Toast.LENGTH_SHORT).show()
                 }
                 is RefundResult.Canceled -> {
-                    Toast.makeText(this, "Refund canceled", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_refund_canceled), Toast.LENGTH_SHORT).show()
                 }
                 is RefundResult.Failed -> {
-                    Toast.makeText(this, "Refund failed ", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_refund_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         }
     }
 
-    @SuppressLint("SetTextI18n")
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
-        loginStateText.text = "State: ${if (isLoggedIn) "Authenticated" else "Unauthenticated"}"
+        loginStateText.text = getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
         loginButton.isEnabled = !isLoggedIn
         logoutButton.isEnabled = isLoggedIn
     }
@@ -153,7 +151,7 @@ class AdvancedActivity : AppCompatActivity() {
     private inner class RefundCallback : RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {
 
         override fun onFailure(reason: RetrieveCardPaymentFailureReason) {
-            Toast.makeText(this@AdvancedActivity, "Refund failed", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this@AdvancedActivity, getString(R.string.toast_refund_failed), Toast.LENGTH_SHORT).show()
         }
 
         override fun onSuccess(payload: CardPaymentPayload) {

@@ -1,3 +1,16 @@
 <resources>
     <string name="app_name">StreckBryggan</string>
+    <string name="state_authenticated">State: Authenticated</string>
+    <string name="state_unauthenticated">State: Unauthenticated</string>
+    <string name="poll_error_status_msg">Error polling for transaction</string>
+    <string name="post_error_status_msg">Error: %s</string>
+    <string name="poll_status_msg">Polling for transaction%s</string>
+    <string name="start_status_msg">Starting transaction %d for SEK %d</string>
+    <string name="idle_status_msg">Idle</string>
+    <string name="toast_payment_completed">Payment completed</string>
+    <string name="toast_payment_canceled">Payment canceled</string>
+    <string name="toast_payment_failed">Payment failed</string>
+    <string name="toast_refund_completed">Refund completed</string>
+    <string name="toast_refund_canceled">Refund canceled</string>
+    <string name="toast_refund_failed">Refund failed</string>
 </resources>

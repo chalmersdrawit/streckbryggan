@@ -1,6 +1,5 @@
 package it.drawit.streckbryggan
 
-import android.annotation.SuppressLint
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -90,30 +89,30 @@ class MainActivity : AppCompatActivity() {
                         is Result.Failure -> {
                             enablePollingButton.isChecked = false
                             pollProgressBar.visibility = View.INVISIBLE
-                            pollStatusText.text = "Error: ${response.error}"
+                            pollStatusText.text = getString(R.string.post_error_status_msg, response.error)
                         }
                     }
                 }
             }
             when (result) {
                 is CardPaymentResult.Completed -> {
-                    Toast.makeText(this, "Payment completed", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_completed), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Canceled -> {
-                    Toast.makeText(this, "Payment canceled", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_canceled), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Failed -> {
-                    Toast.makeText(this, "Payment failed ", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_failed), Toast.LENGTH_SHORT).show()
                 }
             }
         } else {
+            // TODO: add an error activity and put the error there instead
             Toast.makeText(this, "ERROR: Unknown request code: $requestCode", Toast.LENGTH_LONG).show()
         }
     }
 
-    @SuppressLint("SetTextI18n")
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
-        loginStateText.text = "State: ${if (isLoggedIn) "Authenticated" else "Unauthenticated"}"
+        loginStateText.text = getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
         loginButton.isEnabled = !isLoggedIn
         logoutButton.isEnabled = isLoggedIn
     }
@@ -136,7 +135,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun handlePollResponse(response: TransactionPollResponse) {
         if (!enablePollingButton.isChecked) {
-            return;
+            return
         }
 
         when (response) {
@@ -149,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                         .put("PAYMENT_EXTRA_INFO", "Started from home screen")
                         .build()
 
-                pollStatusText.text = """Starting transaction ${response.id} for ${response.amount} kr"""
+                pollStatusText.text = getString(R.string.start_status_msg, response.id, response.amount)
 
                 val intent = CardPaymentActivity.IntentBuilder(this)
                         .amount(response.amount)
@@ -165,8 +164,8 @@ class MainActivity : AppCompatActivity() {
             is TransactionPollResponse.NoPending -> {
                 // Animate ellipsis in a cool-looking way.
                 // Must never remove this beautifully disgusting piece of code
-                val dots = pollStatusText.text.count { c -> c == '.' } + 1
-                pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
+                val ellipsis = pollStatusText.text.count { c -> c == '.' } + 1
+                pollStatusText.text = getString(R.string.poll_status_msg, ".".repeat(ellipsis % 4))
 
                 val pollJob = GlobalScope.launch {
                     delay(timeMillis = 1000)
@@ -189,7 +188,7 @@ class MainActivity : AppCompatActivity() {
                     failure = {
                         enablePollingButton.isChecked = false
                         pollProgressBar.visibility = View.INVISIBLE
-                        pollStatusText.text = "Error polling for transaction"
+                        pollStatusText.text = getString(R.string.poll_error_status_msg)
                     }
             )
         }
@@ -199,14 +198,14 @@ class MainActivity : AppCompatActivity() {
     private fun onPollingCheckBoxClicked() {
         if (enablePollingButton.isChecked) {
             pollProgressBar.visibility = View.VISIBLE
-            pollStatusText.text = "Polling for transaction"
+            pollStatusText.text = getString(R.string.poll_status_msg)
 
             poll()
         } else {
             this.pollJob?.cancel()
 
             pollProgressBar.visibility = View.INVISIBLE
-            pollStatusText.text = "Idle"
+            pollStatusText.text = getString(R.string.idle_status_msg)
         }
     }
 
