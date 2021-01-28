@@ -134,56 +134,63 @@ class MainActivity : AppCompatActivity() {
         startActivity(CardReadersActivity.newIntent(this))
     }
 
+    private fun handlePollResponse(response: TransactionPollResponse) {
+        if (!enablePollingButton.isChecked) {
+            return;
+        }
+
+        when (response) {
+            is TransactionPollResponse.Pending -> {
+                //val internalTraceId = UUID.randomUUID().toString()
+                val enableTipping = false
+                val enableInstallments = false
+                val enableLogin = false
+                val reference = TransactionReference.Builder(response.id.toString())
+                        .put("PAYMENT_EXTRA_INFO", "Started from home screen")
+                        .build()
+
+                pollStatusText.text = """Starting transaction ${response.id} for ${response.amount} kr"""
+
+                val intent = CardPaymentActivity.IntentBuilder(this)
+                        .amount(response.amount)
+                        .reference(reference)
+                        .enableTipping(enableTipping) // Only for markets with tipping support
+                        .enableInstalments(enableInstallments) // Only for markets with installments support
+                        .enableLogin(enableLogin) // Mandatory to set
+                        .build()
+
+                startActivityForResult(intent, REQUEST_CODE_PAYMENT)
+                lastPaymentTraceId.value = response.id.toString()
+            }
+            is TransactionPollResponse.NoPending -> {
+                // Animate ellipsis in a cool-looking way.
+                // Must never remove this beautifully disgusting piece of code
+                val dots = pollStatusText.text.count { c -> c == '.' } + 1
+                pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
+
+                val pollJob = GlobalScope.launch {
+                    delay(timeMillis = 1000)
+                    poll()
+                }
+                pollJob.start()
+                this.pollJob = pollJob
+            }
+        }
+    }
+
     private fun poll() {
         connection.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
             result.fold(
                     success = {
                         runOnUiThread {
-                            if (enablePollingButton.isChecked) {
-                                when (it) {
-                                    is TransactionPollResponse.Pending -> {
-                                        //val internalTraceId = UUID.randomUUID().toString()
-                                        val enableTipping = false
-                                        val enableInstallments = false
-                                        val enableLogin = false
-                                        val reference = TransactionReference.Builder(it.id.toString())
-                                                .put("PAYMENT_EXTRA_INFO", "Started from home screen")
-                                                .build()
-
-                                        pollStatusText.text = """Starting transaction ${it.id} for ${it.amount} kr"""
-
-                                        val intent = CardPaymentActivity.IntentBuilder(this)
-                                                .amount(it.amount)
-                                                .reference(reference)
-                                                .enableTipping(enableTipping) // Only for markets with tipping support
-                                                .enableInstalments(enableInstallments) // Only for markets with installments support
-                                                .enableLogin(enableLogin) // Mandatory to set
-                                                .build()
-
-                                        startActivityForResult(intent, REQUEST_CODE_PAYMENT)
-                                        lastPaymentTraceId.value = it.id.toString()
-                                    }
-                                    is TransactionPollResponse.NoPending -> {
-                                        // Animate ellipsis in a cool-looking way.
-                                        // Must never remove this beautifully disgusting piece of code
-                                        val dots = pollStatusText.text.count { c -> c == '.' } + 1
-                                        pollStatusText.text = "Polling for transaction${".".repeat(dots % 4)}"
-
-                                        val pollJob = GlobalScope.launch {
-                                            delay(timeMillis = 1000)
-                                            poll()
-                                        }
-                                        pollJob.start()
-                                        this.pollJob = pollJob
-                                    }
-                                }
-                            }
+                            this.handlePollResponse(it)
                         }
-                    }, failure = {
-                enablePollingButton.isChecked = false
-                pollProgressBar.visibility = View.INVISIBLE
-                pollStatusText.text = "Error polling for transaction"
-            }
+                    },
+                    failure = {
+                        enablePollingButton.isChecked = false
+                        pollProgressBar.visibility = View.INVISIBLE
+                        pollStatusText.text = "Error polling for transaction"
+                    }
             )
         }
     }
