@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".MainActivity"
+    tools:ignore="HardcodedText">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/viewHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:gravity="center"
+            android:text="Oopsie Woopsie UwU"
+            android:textAppearance="@style/TextAppearance.Otto.LargeBold" />
+
+        <TextView
+            android:id="@+id/viewSubHeader"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:text="an error occured"
+            android:textAlignment="center"
+            android:textStyle="italic" />
+
+        <EditText
+            android:id="@+id/errorTextBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:editable="false"
+            android:ems="10"
+            android:fontFamily="monospace"
+            android:gravity="start|top"
+            android:inputType="textMultiLine"
+            android:text="placeholder"
+            android:textIsSelectable="true" />
+
+        <!-- Authentication -->
+
+        <!-- Payment -->
+
+        <!-- Refund -->
+
+        <!-- Settings -->
+
+    </LinearLayout>
+</ScrollView>

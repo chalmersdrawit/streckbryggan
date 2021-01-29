@@ -81,15 +81,15 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     when (response) {
                         is Result.Success -> {
-                            pollStatusText.text = response.value
                             if (enablePollingButton.isChecked) {
-                                poll()
+                                startPolling()
                             }
                         }
                         is Result.Failure -> {
-                            enablePollingButton.isChecked = false
-                            pollProgressBar.visibility = View.INVISIBLE
-                            pollStatusText.text = getString(R.string.post_error_status_msg, response.error)
+                            showPollingDisabled()
+                            // TODO: since the payment went through, but we were unable to post
+                            // the result to the server, we shouldn't just drop this transaction
+                            startActivity(errorIntent(this, getString(R.string.post_error_trace, response.error)))
                         }
                     }
                 }
@@ -106,8 +106,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         } else {
-            // TODO: add an error activity and put the error there instead
-            Toast.makeText(this, "ERROR: Unknown request code: $requestCode", Toast.LENGTH_LONG).show()
+            runOnUiThread {
+                showPollingDisabled()
+                startActivity(errorIntent(this, "Internal Error\n\nUnknown iZettle request code: $requestCode"))
+            }
         }
     }
 
@@ -148,7 +150,7 @@ class MainActivity : AppCompatActivity() {
                         .put("PAYMENT_EXTRA_INFO", "Started from home screen")
                         .build()
 
-                pollStatusText.text = getString(R.string.start_status_msg, response.id, response.amount)
+                pollStatusText.text = getString(R.string.start_status_msg, response.id)
 
                 val intent = CardPaymentActivity.IntentBuilder(this)
                         .amount(response.amount)
@@ -168,6 +170,7 @@ class MainActivity : AppCompatActivity() {
                 pollStatusText.text = getString(R.string.poll_status_msg, ".".repeat(ellipsis % 4))
 
                 val pollJob = GlobalScope.launch {
+                    // call poll again after a reasonable delay
                     delay(timeMillis = 1000)
                     poll()
                 }
@@ -179,33 +182,42 @@ class MainActivity : AppCompatActivity() {
 
     private fun poll() {
         connection.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
-            result.fold(
-                    success = {
-                        runOnUiThread {
+            runOnUiThread {
+                result.fold(
+                        success = {
                             this.handlePollResponse(it)
+                        },
+                        failure = {
+                            showPollingDisabled()
+                            startActivity(errorIntent(
+                                    this, getString(R.string.poll_error_trace, it.message ?: "")))
                         }
-                    },
-                    failure = {
-                        enablePollingButton.isChecked = false
-                        pollProgressBar.visibility = View.INVISIBLE
-                        pollStatusText.text = getString(R.string.poll_error_status_msg)
-                    }
-            )
+                )
+            }
         }
+    }
+
+    private fun startPolling() {
+        pollProgressBar.visibility = View.VISIBLE
+        pollStatusText.text = getString(R.string.poll_status_msg, "")
+
+        poll()
+    }
+
+    private fun showPollingDisabled() {
+        enablePollingButton.isChecked = false
+        pollProgressBar.visibility = View.INVISIBLE
+        pollStatusText.text = getString(R.string.idle_status_msg)
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun onPollingCheckBoxClicked() {
         if (enablePollingButton.isChecked) {
-            pollProgressBar.visibility = View.VISIBLE
-            pollStatusText.text = getString(R.string.poll_status_msg)
-
-            poll()
+            startPolling()
         } else {
             this.pollJob?.cancel()
 
-            pollProgressBar.visibility = View.INVISIBLE
-            pollStatusText.text = getString(R.string.idle_status_msg)
+            showPollingDisabled()
         }
     }
 
