@@ -13,6 +13,12 @@ import com.izettle.payments.android.ui.payment.CardPaymentResult
 
 const val JSON_ENUM_TAG = "type"
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
+data class GenericStatusResponse(
+        var status: Int,
+        var description: String
+)
+
 // TODO:
 // Find some way to avoid @JsonTypeName decoration through some fancy JsonTypeInfo setting.
 // JsonTypeInfo.Id.Name includes the name of the sealed class, e.g. TransactionOver$TransactionPaid
@@ -24,7 +30,7 @@ sealed class TransactionOver {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("TransactionPaid")
-    class TransactionPaid : TransactionOver()
+    object TransactionPaid : TransactionOver()
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("TransactionFailed")
@@ -35,7 +41,7 @@ sealed class TransactionOver {
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("TransactionCanceled")
-    class TransactionCanceled : TransactionOver()
+    object TransactionCanceled : TransactionOver()
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = JSON_ENUM_TAG)
@@ -45,7 +51,7 @@ sealed class TransactionPollResponse {
      * This transaction is expected to be processed by iZettle.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    @JsonTypeName("PaymentOk")
+    @JsonTypeName("PendingPayment")
     data class Pending(
             var id: Int,
             var amount: Long
@@ -57,9 +63,7 @@ sealed class TransactionPollResponse {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("NoPendingTransaction")
-    data class NoPending(
-            var message: String
-    ) : TransactionPollResponse()
+    object NoPending : TransactionPollResponse()
 }
 
 class StrecklistanConnection(
@@ -95,10 +99,10 @@ class StrecklistanConnection(
                 //if (BuildConfig.DEBUG && reference != reference2) {
                 //    error("Assertion failed: Transaction reference mismatch")
                 //}
-                TransactionOver.TransactionPaid()
+                TransactionOver.TransactionPaid
             }
             is CardPaymentResult.Canceled -> {
-                TransactionOver.TransactionCanceled()
+                TransactionOver.TransactionCanceled
             }
             is CardPaymentResult.Failed -> {
                 TransactionOver.TransactionFailed(
@@ -113,8 +117,8 @@ class StrecklistanConnection(
                 .body(json, Charsets.UTF_8).response { _, _, response ->
                     when (response) {
                         is Result.Success -> {
-                            val json = String(response.value, Charsets.UTF_8)
-                            callback(Result.success(json))
+                            val body: GenericStatusResponse = mapper.readValue(response.value)
+                            callback(Result.success(body.description))
                         }
                         is Result.Failure -> {
                             // TODO: proper error handling
