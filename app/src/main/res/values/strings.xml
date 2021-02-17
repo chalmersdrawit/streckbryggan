@@ -8,9 +8,9 @@
     <string name="start_status_msg">Starting transaction %d</string>
     <string name="idle_status_msg">Idle</string>
     <string name="toast_payment_completed">Payment completed</string>
-    <string name="toast_payment_canceled">Payment canceled</string>
+    <string name="toast_payment_cancelled">Payment cancelled</string>
     <string name="toast_payment_failed">Payment failed</string>
     <string name="toast_refund_completed">Refund completed</string>
-    <string name="toast_refund_canceled">Refund canceled</string>
+    <string name="toast_refund_cancelled">Refund cancelled</string>
     <string name="toast_refund_failed">Refund failed</string>
 </resources>

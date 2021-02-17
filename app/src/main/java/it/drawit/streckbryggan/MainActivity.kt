@@ -101,7 +101,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, getString(R.string.toast_payment_completed), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Canceled -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_canceled), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, getString(R.string.toast_payment_cancelled), Toast.LENGTH_SHORT).show()
                 }
                 is CardPaymentResult.Failed -> {
                     Toast.makeText(this, getString(R.string.toast_payment_failed), Toast.LENGTH_SHORT).show()

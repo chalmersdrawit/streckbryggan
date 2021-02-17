@@ -40,8 +40,8 @@ sealed class TransactionOver {
     ) : TransactionOver()
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
-    @JsonTypeName("TransactionCanceled")
-    object TransactionCanceled : TransactionOver()
+    @JsonTypeName("TransactionCancelled")
+    object TransactionCancelled : TransactionOver()
 }
 
 @JsonTypeInfo(use = JsonTypeInfo.Id.NAME, property = JSON_ENUM_TAG)
@@ -102,7 +102,7 @@ class StrecklistanConnection(
                 TransactionOver.TransactionPaid
             }
             is CardPaymentResult.Canceled -> {
-                TransactionOver.TransactionCanceled
+                TransactionOver.TransactionCancelled
             }
             is CardPaymentResult.Failed -> {
                 TransactionOver.TransactionFailed(
