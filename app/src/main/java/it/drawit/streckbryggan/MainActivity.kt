@@ -28,6 +28,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pollStatusText: TextView
     private lateinit var enablePollingButton: ToggleButton
     private lateinit var pollProgressBar: ProgressBar
+    private lateinit var shopButton: Button
     private lateinit var loginStateText: TextView
     private lateinit var loginButton: Button
     private lateinit var logoutButton: Button
@@ -46,6 +47,7 @@ class MainActivity : AppCompatActivity() {
         enablePollingButton = findViewById(R.id.enable_polling_button)
         pollProgressBar = findViewById(R.id.poll_progress_bar)
 
+        shopButton = findViewById(R.id.shopButton)
         loginStateText = findViewById(R.id.login_state)
         loginButton = findViewById(R.id.login_btn)
         logoutButton = findViewById(R.id.logout_btn)
@@ -65,6 +67,7 @@ class MainActivity : AppCompatActivity() {
             onUserAuthStateChanged(authState is LoggedIn)
         })
 
+        shopButton.setOnClickListener { onShopClicked() }
         loginButton.setOnClickListener { onLoginClicked() }
         logoutButton.setOnClickListener { onLogoutClicked() }
         advancedButton.setOnClickListener { onAdvancedClicked() }
@@ -112,6 +115,10 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun onShopClicked() {
+        startActivity(Intent(this, ShopActivity::class.java))
+    }
+
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
         loginStateText.text = getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
         loginButton.isEnabled = !isLoggedIn
@@ -146,7 +153,7 @@ class MainActivity : AppCompatActivity() {
                 val enableInstallments = false
                 val enableLogin = false
                 val reference = TransactionReference.Builder(response.id.toString())
-                        .put("PAYMENT_EXTRA_INFO", "Started from home screen")
+                        .put("PAYMENT_EXTRA_INFO", "Started from StreckBryggan")
                         .build()
 
                 pollStatusText.text = getString(R.string.start_status_msg, response.id)

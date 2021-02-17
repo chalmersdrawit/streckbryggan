@@ -72,8 +72,8 @@ class StrecklistanConnection(
         private val strecklistanPass: String
 ) {
     private val mapper = jacksonObjectMapper()
-    private val pollUri = "$strecklistanBaseUri/izettle/bridge/poll"
-    private val postUri = { reference: Int -> "$strecklistanBaseUri/izettle/bridge/payment_response/$reference" }
+    private val pollUri = "$strecklistanBaseUri/api/izettle/bridge/poll"
+    private val postUri = { reference: Int -> "$strecklistanBaseUri/api/izettle/bridge/payment_response/$reference" }
 
     fun pollTransaction(callback: (s: Result<TransactionPollResponse, FuelError>) -> Unit) {
         Fuel.get(pollUri)
