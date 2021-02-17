@@ -7,7 +7,6 @@ import android.view.View
 import android.widget.*
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.Observer
 import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.result.Result
 import com.izettle.android.commons.ext.state.toLiveData
@@ -62,7 +61,7 @@ class MainActivity : AppCompatActivity() {
                 strecklistanPass
         )
 
-        user.state.toLiveData().observe(this, Observer { authState: User.AuthState? ->
+        user.state.toLiveData().observe(this, { authState: User.AuthState? ->
             onUserAuthStateChanged(authState is LoggedIn)
         })
 
