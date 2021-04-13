@@ -13,4 +13,5 @@
     <string name="toast_refund_completed">Refund completed</string>
     <string name="toast_refund_cancelled">Refund cancelled</string>
     <string name="toast_refund_failed">Refund failed</string>
+    <string name="post_error_no_connection">Connection was shut down before transaction could commit</string>
 </resources>

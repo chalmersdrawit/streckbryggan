@@ -31,8 +31,8 @@ android {
             it.resValue 'string', 'redirect_url_scheme', iZettleSDK.redirectUrlScheme
             it.resValue 'string', 'redirect_url_host', iZettleSDK.redirectUrlHost
             it.resValue 'string', 'strecklistan_base_uri', strecklistan.baseUri
-            it.resValue 'string', 'strecklistan_http_user', strecklistan.basicAuthUser
-            it.resValue 'string', 'strecklistan_http_pass', strecklistan.basicAuthPass
+            //it.resValue 'string', 'strecklistan_http_user', strecklistan.basicAuthUser
+            //it.resValue 'string', 'strecklistan_http_pass', strecklistan.basicAuthPass
         }
     }
 
