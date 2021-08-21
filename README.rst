@@ -17,3 +17,25 @@ How to get started
 
 - Copy the ``secrets.gradle.example`` file and fill in the required variables
   from strecklistan, github, and your iZettle developer account.
+
+
+How to compile release APK
+--------------------------
+
+Steps: ::
+
+    # compile the app
+    ./gradlew assemble
+
+    # magic bs
+    zipalign -v -p 4 \
+        app/build/outputs/apk/release/app-release-unsigned.apk \
+        app-release-unsigned-aligned.apk
+
+    # Create a key to sign the APK with
+    keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-alias
+
+    # Sign the APK
+    apksigner sign --ks my-release-key.jks \
+        --out streckbryggan.apk \
+        app-release-unsigned-aligned.apk
