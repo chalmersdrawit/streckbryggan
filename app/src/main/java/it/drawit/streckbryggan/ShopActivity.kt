@@ -3,6 +3,7 @@ package it.drawit.streckbryggan
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.SharedPreferences
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.os.Build
 import android.os.Bundle
 import android.view.View
@@ -39,7 +40,9 @@ class ShopActivity : AppCompatActivity() {
 
     private var connection: StrecklistanConnection? = null
     private lateinit var prefs: SharedPreferences
+    private lateinit var prefListener: OnSharedPreferenceChangeListener
     private var pollJob: Job? = null
+    private var reloadSettings = true
 
     data class WebViewAuth(val username: String, val password: String): WebViewClient() {
         override fun onReceivedHttpAuthRequest(view: WebView?, handler: HttpAuthHandler, host: String?, realm: String?) {
@@ -62,14 +65,24 @@ class ShopActivity : AppCompatActivity() {
         settingsButton.setOnClickListener { onSettingsClicked() }
 
         prefs = getSharedPreferences(fileStrecklistan, MODE_PRIVATE)!!
-        prefs.registerOnSharedPreferenceChangeListener { _, _ ->
-            runOnUiThread { resetStrecklistanConnection() }
+        // pref listener needs to be stored in a member variable or else it will be garbage collected
+        prefListener = OnSharedPreferenceChangeListener { _, _ ->
+            reloadSettings = true
         }
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
 
         resetStrecklistanConnection()
 
         user.state.toLiveData().observe(this) { authState ->
             onUserAuthStateChanged(authState is User.AuthState.LoggedIn)
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (reloadSettings) {
+            reloadSettings = false
+            resetStrecklistanConnection()
         }
     }
 
@@ -131,11 +144,12 @@ class ShopActivity : AppCompatActivity() {
         pollJob?.cancel()
         showPollingDisabled()
 
-        connection = null;
+        connection = null
         prefs.getString(prefStrecklistanUrl, null)?.let {
             val strecklistanBaseUri = it
             val strecklistanUser = prefs.getString(prefStrecklistanUser, "")!!
             val strecklistanPass = prefs.getString(prefStrecklistanPass, "")!!
+
             connection = StrecklistanConnection(
                     strecklistanBaseUri,
                     strecklistanUser,
