@@ -40,18 +40,16 @@ class SettingsActivity : AppCompatActivity() {
         strecklistanPassInput = findViewById(R.id.sl_pass_text_field)
 
         val prefs = getSharedPreferences(fileStrecklistan, MODE_PRIVATE)!!
-        strecklistanUrlInput.text = prefs.getString(prefStrecklistanUrl, getString(R.string.strecklistan_base_uri))
-        strecklistanUserInput.text = prefs.getString(prefStrecklistanUser, null)
-        strecklistanPassInput.text = prefs.getString(prefStrecklistanPass, null)
 
-        val addTextPrefListener = { view: TextView, pref: String ->
+        val setupPrefView = { view: TextView, pref: Pref ->
+            view.text = pref.get(prefs, this)
             view.addTextChangedListener(
-                    SimpleTextWatcher { s -> prefs.edit().putString(pref, s).commit() })
+                    SimpleTextWatcher { s -> pref.set(prefs, s) })
         }
 
-        addTextPrefListener(strecklistanUrlInput, prefStrecklistanUrl)
-        addTextPrefListener(strecklistanUserInput, prefStrecklistanUser)
-        addTextPrefListener(strecklistanPassInput, prefStrecklistanPass)
+        setupPrefView(strecklistanUrlInput, prefStrecklistanUrl)
+        setupPrefView(strecklistanUserInput, prefStrecklistanUser)
+        setupPrefView(strecklistanPassInput, prefStrecklistanPass)
 
         user.state.toLiveData().observe(this, { authState: User.AuthState? ->
             onUserAuthStateChanged(authState is LoggedIn)

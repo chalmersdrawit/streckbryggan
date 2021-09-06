@@ -6,12 +6,7 @@ import android.content.SharedPreferences
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.webkit.HttpAuthHandler
-import android.webkit.WebView
-import android.webkit.WebViewClient
 import android.widget.Button
-import android.widget.ProgressBar
 import android.widget.Toast
 import android.widget.ToggleButton
 import androidx.annotation.RequiresApi
@@ -28,15 +23,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import com.izettle.payments.android.sdk.IZettleSDK.Instance.user
 import com.izettle.payments.android.sdk.User
+import org.mozilla.geckoview.GeckoResult
+import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoSession
+import org.mozilla.geckoview.GeckoView
 
 
 class ShopActivity : AppCompatActivity() {
 
-    private lateinit var shopView: WebView
+    private lateinit var webView: GeckoView
+    private val geckoSession = GeckoSession()
 
     private lateinit var enablePollingButton: ToggleButton
-    private lateinit var pollProgressBar: ProgressBar
     private lateinit var settingsButton: Button
+    private lateinit var pulseIndicator: PulseIndicator
 
     private var connection: StrecklistanConnection? = null
     private lateinit var prefs: SharedPreferences
@@ -44,22 +44,29 @@ class ShopActivity : AppCompatActivity() {
     private var pollJob: Job? = null
     private var reloadSettings = true
 
-    data class WebViewAuth(val username: String, val password: String): WebViewClient() {
-        override fun onReceivedHttpAuthRequest(view: WebView?, handler: HttpAuthHandler, host: String?, realm: String?) {
-            handler.proceed(username, password)
+    data class GeckoViewAuth(val username: String, val password: String):
+        GeckoSession.PromptDelegate {
+        override fun onAuthPrompt(
+            session: GeckoSession,
+            prompt: GeckoSession.PromptDelegate.AuthPrompt
+        ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse>? {
+            return GeckoResult.fromValue(prompt.confirm(username, password))
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_shop)
 
-        shopView = findViewById(R.id.shop_view)
+        webView = findViewById(R.id.web_view)
+        val runtime = GeckoRuntime.create(this)
+        geckoSession.open(runtime)
+        webView.setSession(geckoSession)
+
         enablePollingButton = findViewById(R.id.enable_polling_button)
-        pollProgressBar = findViewById(R.id.poll_progress_bar)
         settingsButton = findViewById(R.id.settings_button)
+        pulseIndicator = PulseIndicator(this)
 
         enablePollingButton.setOnClickListener { onPollingCheckBoxClicked() }
         settingsButton.setOnClickListener { onSettingsClicked() }
@@ -145,23 +152,26 @@ class ShopActivity : AppCompatActivity() {
         showPollingDisabled()
 
         connection = null
-        prefs.getString(prefStrecklistanUrl, null)?.let {
-            val strecklistanBaseUri = it
-            val strecklistanUser = prefs.getString(prefStrecklistanUser, "")!!
-            val strecklistanPass = prefs.getString(prefStrecklistanPass, "")!!
+
+        val strecklistanBaseUri = prefStrecklistanUrl.get(prefs, this)
+
+        if (strecklistanBaseUri != "") {
+            val strecklistanUser = prefStrecklistanUser.get(prefs, this)
+            val strecklistanPass = prefStrecklistanPass.get(prefs, this)
 
             connection = StrecklistanConnection(
                     strecklistanBaseUri,
                     strecklistanUser,
                     strecklistanPass,
             )
-            shopView.webViewClient = WebViewAuth(strecklistanUser, strecklistanPass)
-            shopView.settings.javaScriptEnabled = true
-            //shopView.requestFocus()
-            shopView.loadUrl(strecklistanBaseUri)
-        }
 
-        enablePollingButton.isEnabled = connection != null
+            geckoSession.promptDelegate = GeckoViewAuth(strecklistanUser, strecklistanPass)
+            geckoSession.loadUri(strecklistanBaseUri)
+
+            enablePollingButton.isEnabled = true
+        } else {
+            enablePollingButton.isEnabled = false
+        }
     }
 
     private fun handlePollResponse(response: TransactionPollResponse) {
@@ -179,8 +189,6 @@ class ShopActivity : AppCompatActivity() {
                         .put("PAYMENT_EXTRA_INFO", "Started from StreckBryggan")
                         .build()
 
-                //pollStatusText.text = getString(R.string.start_status_msg, response.id)
-
                 val intent = CardPaymentActivity.IntentBuilder(this)
                         .amount(response.amount)
                         .reference(reference)
@@ -193,11 +201,6 @@ class ShopActivity : AppCompatActivity() {
                 lastPaymentTraceId.value = response.id.toString()
             }
             is TransactionPollResponse.NoPending -> {
-                // Animate ellipsis in a cool-looking way.
-                // Must never remove this beautifully disgusting piece of code
-                //val ellipsis = pollStatusText.text.count { c -> c == '.' } + 1
-                //pollStatusText.text = getString(R.string.poll_status_msg, ".".repeat(ellipsis % 4))
-
                 val pollJob = GlobalScope.launch {
                     // call poll again after a reasonable delay
                     delay(timeMillis = 1000)
@@ -227,16 +230,13 @@ class ShopActivity : AppCompatActivity() {
     }
 
     private fun startPolling() {
-        pollProgressBar.visibility = View.VISIBLE
-        //pollStatusText.text = getString(R.string.poll_status_msg, "")
-
+        pulseIndicator.start()
         poll()
     }
 
     private fun showPollingDisabled() {
         enablePollingButton.isChecked = false
-        pollProgressBar.visibility = View.INVISIBLE
-        //pollStatusText.text = getString(R.string.idle_status_msg)
+        pulseIndicator.stop()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
