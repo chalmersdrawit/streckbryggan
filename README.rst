@@ -22,7 +22,15 @@ How to get started
 How to compile release APK
 --------------------------
 
-Steps: ::
+First, set up a key store ::
+
+    keytool -genkey -v -keystore release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-alias
+
+Then, run the makefile: ::
+
+    make release
+
+Or, you can go through the steps manually: ::
 
     # compile the app
     ./gradlew assemble
@@ -32,10 +40,7 @@ Steps: ::
         app/build/outputs/apk/release/app-release-unsigned.apk \
         app-release-unsigned-aligned.apk
 
-    # Create a key to sign the APK with
-    keytool -genkey -v -keystore my-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias my-alias
-
     # Sign the APK
-    apksigner sign --ks my-release-key.jks \
+    apksigner sign --ks release-key.jks \
         --out streckbryggan.apk \
         app-release-unsigned-aligned.apk
