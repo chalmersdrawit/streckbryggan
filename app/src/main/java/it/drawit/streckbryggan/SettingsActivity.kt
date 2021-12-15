@@ -44,7 +44,7 @@ class SettingsActivity : AppCompatActivity() {
         val setupPrefView = { view: TextView, pref: Pref ->
             view.text = pref.get(prefs, this)
             view.addTextChangedListener(
-                    SimpleTextWatcher { s -> pref.set(prefs, s) })
+                SimpleTextWatcher { s -> pref.set(prefs, s) })
         }
 
         setupPrefView(strecklistanUrlInput, prefStrecklistanUrl)
@@ -62,7 +62,8 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
-        loginStateText.text = getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
+        loginStateText.text =
+            getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
         loginButton.isEnabled = !isLoggedIn
         logoutButton.isEnabled = isLoggedIn
     }

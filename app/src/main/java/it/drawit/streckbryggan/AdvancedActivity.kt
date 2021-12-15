@@ -70,37 +70,64 @@ class AdvancedActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_PAYMENT && data != null) {
-            val result: CardPaymentResult = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
+            val result: CardPaymentResult =
+                data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
             when (result) {
                 is CardPaymentResult.Completed -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_completed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_completed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is CardPaymentResult.Canceled -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_cancelled), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_cancelled),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is CardPaymentResult.Failed -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_failed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
         if (requestCode == REQUEST_CODE_REFUND && data != null) {
-            val result: RefundResult? = data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)
+            val result: RefundResult? =
+                data.getParcelableExtra(RefundsActivity.RESULT_EXTRA_PAYLOAD)
             when (result) {
                 is RefundResult.Completed -> {
-                    Toast.makeText(this, getString(R.string.toast_refund_completed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_refund_completed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is RefundResult.Canceled -> {
-                    Toast.makeText(this, getString(R.string.toast_refund_cancelled), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_refund_cancelled),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is RefundResult.Failed -> {
-                    Toast.makeText(this, getString(R.string.toast_refund_failed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_refund_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
     }
 
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
-        loginStateText.text = getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
+        loginStateText.text =
+            getString(if (isLoggedIn) R.string.state_authenticated else R.string.state_unauthenticated)
         loginButton.isEnabled = !isLoggedIn
         logoutButton.isEnabled = isLoggedIn
     }
@@ -124,16 +151,16 @@ class AdvancedActivity : AppCompatActivity() {
         val enableInstallments = installmentsCheckBox.isChecked
         val enableLogin = loginCheckBox.isChecked
         val reference = TransactionReference.Builder(internalTraceId)
-                .put("PAYMENT_EXTRA_INFO", "Started from home screen")
-                .build()
+            .put("PAYMENT_EXTRA_INFO", "Started from home screen")
+            .build()
 
         val intent = CardPaymentActivity.IntentBuilder(this)
-                .amount(amount)
-                .reference(reference)
-                .enableTipping(enableTipping) // Only for markets with tipping support
-                .enableInstalments(enableInstallments) // Only for markets with installments support
-                .enableLogin(enableLogin) // Mandatory to set
-                .build()
+            .amount(amount)
+            .reference(reference)
+            .enableTipping(enableTipping) // Only for markets with tipping support
+            .enableInstalments(enableInstallments) // Only for markets with installments support
+            .enableLogin(enableLogin) // Mandatory to set
+            .build()
 
         startActivityForResult(intent, REQUEST_CODE_PAYMENT)
         lastPaymentTraceId.value = internalTraceId
@@ -148,22 +175,27 @@ class AdvancedActivity : AppCompatActivity() {
         refundsManager.retrieveCardPayment(internalTraceId, RefundCallback())
     }
 
-    private inner class RefundCallback : RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {
+    private inner class RefundCallback :
+        RefundsManager.Callback<CardPaymentPayload, RetrieveCardPaymentFailureReason> {
 
         override fun onFailure(reason: RetrieveCardPaymentFailureReason) {
-            Toast.makeText(this@AdvancedActivity, getString(R.string.toast_refund_failed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this@AdvancedActivity,
+                getString(R.string.toast_refund_failed),
+                Toast.LENGTH_SHORT
+            ).show()
         }
 
         override fun onSuccess(payload: CardPaymentPayload) {
             val reference = TransactionReference.Builder(payload.referenceId)
-                    .put("REFUND_EXTRA_INFO", "Started from home screen")
-                    .build()
+                .put("REFUND_EXTRA_INFO", "Started from home screen")
+                .build()
             val intent = RefundsActivity.IntentBuilder(this@AdvancedActivity)
-                    .cardPayment(payload)
-                    .receiptNumber("#123456")
-                    .taxAmount(payload.amount / 10)
-                    .reference(reference)
-                    .build()
+                .cardPayment(payload)
+                .receiptNumber("#123456")
+                .taxAmount(payload.amount / 10)
+                .reference(reference)
+                .build()
             startActivityForResult(intent, REQUEST_CODE_REFUND)
         }
     }

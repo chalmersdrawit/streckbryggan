@@ -11,16 +11,11 @@ import android.widget.Toast
 import android.widget.ToggleButton
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
-import com.github.kittinunf.fuel.core.FuelError
 import com.github.kittinunf.result.Result
 import com.izettle.android.commons.ext.state.toLiveData
 import com.izettle.payments.android.payment.TransactionReference
 import com.izettle.payments.android.ui.payment.CardPaymentActivity
 import com.izettle.payments.android.ui.payment.CardPaymentResult
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import com.izettle.payments.android.sdk.IZettleSDK.Instance.user
 import com.izettle.payments.android.sdk.User
 import org.mozilla.geckoview.GeckoResult
@@ -38,13 +33,14 @@ class ShopActivity : AppCompatActivity() {
     private lateinit var settingsButton: Button
     private lateinit var pulseIndicator: PulseIndicator
 
-    private var connection: StrecklistanConnection? = null
+    private var poller: StrecklistanPoller? = null
+
     private lateinit var prefs: SharedPreferences
     private lateinit var prefListener: OnSharedPreferenceChangeListener
-    private var pollJob: Job? = null
     private var reloadSettings = true
 
-    data class GeckoViewAuth(val username: String, val password: String):
+
+    data class GeckoViewAuth(val username: String, val password: String) :
         GeckoSession.PromptDelegate {
         override fun onAuthPrompt(
             session: GeckoSession,
@@ -96,12 +92,16 @@ class ShopActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_CODE_PAYMENT && data != null) {
-            val result: CardPaymentResult = data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
-            val connection = this.connection
-            if(connection == null) {
+            val result: CardPaymentResult =
+                data.getParcelableExtra(CardPaymentActivity.RESULT_EXTRA_PAYLOAD)!!
+            val connection = this.poller?.connection
+            if (connection == null) {
                 startActivity(errorIntent(this, getString(R.string.post_error_no_connection)))
             } else {
-                connection.postTransactionResult(Integer.parseInt(lastPaymentTraceId.value!!), result) { response ->
+                connection.postTransactionResult(
+                    Integer.parseInt(lastPaymentTraceId.value!!),
+                    result
+                ) { response ->
                     runOnUiThread {
                         when (response) {
                             is Result.Success -> {
@@ -110,10 +110,14 @@ class ShopActivity : AppCompatActivity() {
                                 }
                             }
                             is Result.Failure -> {
-                                showPollingDisabled()
                                 // TODO: since the payment went through, but we were unable to post
                                 // the result to the server, we shouldn't just drop this transaction
-                                startActivity(errorIntent(this, getString(R.string.post_error_trace, response.error)))
+                                startActivity(
+                                    errorIntent(
+                                        this,
+                                        getString(R.string.post_error_trace, response.error)
+                                    )
+                                )
                             }
                         }
                     }
@@ -121,19 +125,36 @@ class ShopActivity : AppCompatActivity() {
             }
             when (result) {
                 is CardPaymentResult.Completed -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_completed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_completed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is CardPaymentResult.Canceled -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_cancelled), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_cancelled),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
                 is CardPaymentResult.Failed -> {
-                    Toast.makeText(this, getString(R.string.toast_payment_failed), Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        this,
+                        getString(R.string.toast_payment_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         } else {
             runOnUiThread {
-                showPollingDisabled()
-                startActivity(errorIntent(this, "Internal Error\n\nUnknown iZettle request code: $requestCode"))
+                stopPolling()
+                startActivity(
+                    errorIntent(
+                        this,
+                        "Internal Error\n\nUnknown iZettle request code: $requestCode"
+                    )
+                )
             }
         }
     }
@@ -141,17 +162,15 @@ class ShopActivity : AppCompatActivity() {
     private fun onUserAuthStateChanged(isLoggedIn: Boolean) {
         enablePollingButton.isEnabled = isLoggedIn
         if (!isLoggedIn) {
-            showPollingDisabled()
-            pollJob?.cancel()
+            stopPolling()
         }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun resetStrecklistanConnection() {
-        pollJob?.cancel()
         showPollingDisabled()
 
-        connection = null
+        poller = null
 
         val strecklistanBaseUri = prefStrecklistanUrl.get(prefs, this)
 
@@ -159,14 +178,27 @@ class ShopActivity : AppCompatActivity() {
             val strecklistanUser = prefStrecklistanUser.get(prefs, this)
             val strecklistanPass = prefStrecklistanPass.get(prefs, this)
 
-            connection = StrecklistanConnection(
-                    strecklistanBaseUri,
-                    strecklistanUser,
-                    strecklistanPass,
+            val connection = StrecklistanConnection(
+                strecklistanBaseUri,
+                strecklistanUser,
+                strecklistanPass,
             )
 
             geckoSession.promptDelegate = GeckoViewAuth(strecklistanUser, strecklistanPass)
             geckoSession.loadUri(strecklistanBaseUri)
+
+            poller = StrecklistanPoller(
+                connection,
+                { pending -> onPendingTransaction(pending) },
+                { error ->
+                    stopPolling()
+                    startActivity(
+                        errorIntent(
+                            this,
+                            getString(R.string.poll_error_trace, error.message ?: "")
+                        )
+                    )
+                })
 
             enablePollingButton.isEnabled = true
         } else {
@@ -174,64 +206,35 @@ class ShopActivity : AppCompatActivity() {
         }
     }
 
-    private fun handlePollResponse(response: TransactionPollResponse) {
-        if (!enablePollingButton.isChecked) {
-            return
-        }
+    private fun onPendingTransaction(transaction: TransactionPollResponse.Pending) {
+        //val internalTraceId = UUID.randomUUID().toString()
+        val enableTipping = false
+        val enableInstallments = false
+        val enableLogin = false
+        val reference = TransactionReference.Builder(transaction.id.toString())
+            .put("PAYMENT_EXTRA_INFO", "Started from StreckBryggan")
+            .build()
 
-        when (response) {
-            is TransactionPollResponse.Pending -> {
-                //val internalTraceId = UUID.randomUUID().toString()
-                val enableTipping = false
-                val enableInstallments = false
-                val enableLogin = false
-                val reference = TransactionReference.Builder(response.id.toString())
-                        .put("PAYMENT_EXTRA_INFO", "Started from StreckBryggan")
-                        .build()
+        val intent = CardPaymentActivity.IntentBuilder(this)
+            .amount(transaction.amount)
+            .reference(reference)
+            .enableTipping(enableTipping) // Only for markets with tipping support
+            .enableInstalments(enableInstallments) // Only for markets with installments support
+            .enableLogin(enableLogin) // Mandatory to set
+            .build()
 
-                val intent = CardPaymentActivity.IntentBuilder(this)
-                        .amount(response.amount)
-                        .reference(reference)
-                        .enableTipping(enableTipping) // Only for markets with tipping support
-                        .enableInstalments(enableInstallments) // Only for markets with installments support
-                        .enableLogin(enableLogin) // Mandatory to set
-                        .build()
-
-                startActivityForResult(intent, REQUEST_CODE_PAYMENT)
-                lastPaymentTraceId.value = response.id.toString()
-            }
-            is TransactionPollResponse.NoPending -> {
-                val pollJob = GlobalScope.launch {
-                    // call poll again after a reasonable delay
-                    delay(timeMillis = 1000)
-                    poll()
-                }
-                pollJob.start()
-                this.pollJob = pollJob
-            }
-        }
-    }
-
-    private fun poll() {
-        connection?.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
-            runOnUiThread {
-                result.fold(
-                        success = {
-                            this.handlePollResponse(it)
-                        },
-                        failure = {
-                            showPollingDisabled()
-                            startActivity(errorIntent(
-                                    this, getString(R.string.poll_error_trace, it.message ?: "")))
-                        }
-                )
-            }
-        }
+        startActivityForResult(intent, REQUEST_CODE_PAYMENT)
+        lastPaymentTraceId.value = transaction.id.toString()
     }
 
     private fun startPolling() {
         pulseIndicator.start()
-        poll()
+        poller?.startPolling()
+    }
+
+    private fun stopPolling() {
+        poller?.stopPolling()
+        showPollingDisabled()
     }
 
     private fun showPollingDisabled() {
@@ -244,9 +247,7 @@ class ShopActivity : AppCompatActivity() {
         if (enablePollingButton.isChecked) {
             startPolling()
         } else {
-            this.pollJob?.cancel()
-
-            showPollingDisabled()
+            stopPolling()
         }
     }
 

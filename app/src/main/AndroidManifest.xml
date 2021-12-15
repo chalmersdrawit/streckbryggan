@@ -15,7 +15,8 @@
         android:roundIcon="@mipmap/streckbrygged_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
-        tools:replace="android:fullBackupContent">
+        tools:replace="android:fullBackupContent"
+        android:extractNativeLibs="true">
 
         <activity android:name="it.drawit.streckbryggan.ShopActivity">
             <intent-filter>

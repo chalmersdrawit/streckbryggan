@@ -23,7 +23,8 @@ class PulseIndicator() {
     private lateinit var viewInner: View
     private var started: Boolean = false
 
-    private var runningAnims: ConcurrentMap<Pair<PulseRing, PulseDir>, Pair<ObjectAnimator, ObjectAnimator>> = ConcurrentHashMap()
+    private var runningAnims: ConcurrentMap<Pair<PulseRing, PulseDir>, Pair<ObjectAnimator, ObjectAnimator>> =
+        ConcurrentHashMap()
 
     constructor(context: AppCompatActivity) : this() {
         viewOuter = context.findViewById(R.id.poll_indicator_outer)
