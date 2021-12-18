@@ -1,11 +1,16 @@
 package it.drawit.streckbryggan
 
 import android.animation.Animator
+import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.view.View
 import androidx.appcompat.app.AppCompatActivity
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentMap
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import org.mozilla.gecko.util.ThreadUtils.runOnUiThread
+
 
 class PulseIndicator() {
     enum class PulseDir {
@@ -19,25 +24,48 @@ class PulseIndicator() {
         Outer,
     }
 
-    private lateinit var viewOuter: View
-    private lateinit var viewInner: View
-    private var started: Boolean = false
+    private lateinit var outerRing: View
+    private lateinit var innerRing: View
 
-    private var runningAnims: ConcurrentMap<Pair<PulseRing, PulseDir>, Pair<ObjectAnimator, ObjectAnimator>> =
-        ConcurrentHashMap()
+    private var animator: SyncAnimator = SyncAnimator()
 
     constructor(context: AppCompatActivity) : this() {
-        viewOuter = context.findViewById(R.id.poll_indicator_outer)
-        viewInner = context.findViewById(R.id.poll_indicator_inner)
+        outerRing = context.findViewById(R.id.poll_indicator_outer)
+        innerRing = context.findViewById(R.id.poll_indicator_inner)
 
-        playAnim(PulseRing.Inner, PulseDir.NEUTRAL)
-        playAnim(PulseRing.Outer, PulseDir.NEUTRAL)
+        neutral()
     }
 
-    private fun playAnim(ring: PulseRing, dir: PulseDir) {
+    private fun breatheIn() {
+        val animations = ArrayList<Animator>()
+        prepareAnimation(animations, PulseRing.Inner, PulseDir.SHRINK)
+        prepareAnimation(animations, PulseRing.Outer, PulseDir.GROW)
+        animator.play(animations) { breatheOut() }
+    }
+
+    private fun breatheOut() {
+        val animations = ArrayList<Animator>()
+        prepareAnimation(animations, PulseRing.Inner, PulseDir.GROW)
+        prepareAnimation(animations, PulseRing.Outer, PulseDir.SHRINK)
+        animator.play(animations) { breatheIn() }
+
+    }
+
+    private fun neutral() {
+        val animations = ArrayList<Animator>()
+        prepareAnimation(animations, PulseRing.Inner, PulseDir.NEUTRAL)
+        prepareAnimation(animations, PulseRing.Outer, PulseDir.NEUTRAL)
+        animator.play(animations)
+    }
+
+    private fun prepareAnimation(
+        animationSet: MutableList<Animator>,
+        ring: PulseRing,
+        dir: PulseDir
+    ) {
         val view = when (ring) {
-            PulseRing.Outer -> viewOuter
-            PulseRing.Inner -> viewInner
+            PulseRing.Outer -> outerRing
+            PulseRing.Inner -> innerRing
         }
 
         val target = animTarget(ring, dir)
@@ -48,11 +76,8 @@ class PulseIndicator() {
         animY.duration = animDuration(dir)
         animX.repeatCount = 0
         animY.repeatCount = 0
-        animX.addListener(AnimatorEndListener { onAnimEnd(ring, dir) })
-        animX.start()
-        animY.start()
-
-        runningAnims[Pair(ring, dir)] = Pair(animX, animY)
+        animationSet.add(animX)
+        animationSet.add(animY)
     }
 
     private fun animTarget(ring: PulseRing, dir: PulseDir): Float {
@@ -75,49 +100,40 @@ class PulseIndicator() {
         }
     }
 
-    private fun onAnimEnd(ring: PulseRing, dir: PulseDir) {
-        runningAnims.remove(Pair(ring, dir))
-
-        if (started) {
-            when (dir) {
-                PulseDir.SHRINK -> playAnim(ring, PulseDir.GROW)
-                PulseDir.GROW -> playAnim(ring, PulseDir.SHRINK)
-                else -> {
-                }
-            }
-        }
-    }
-
-    private fun stopAllAnims() {
-        runningAnims.iterator()
-            .forEach { animXY -> animXY.value.first.cancel(); animXY.value.second.cancel() }
-        runningAnims.clear()
-    }
-
     fun start() {
-        started = true
-        stopAllAnims()
-        playAnim(PulseRing.Inner, PulseDir.SHRINK)
-        playAnim(PulseRing.Outer, PulseDir.GROW)
+        breatheIn()
     }
 
     fun stop() {
-        started = false
-        stopAllAnims()
-        playAnim(PulseRing.Inner, PulseDir.NEUTRAL)
-        playAnim(PulseRing.Outer, PulseDir.NEUTRAL)
+        neutral()
     }
 
-    data class AnimatorEndListener(val callback: () -> Unit) : Animator.AnimatorListener {
+    /** Play a set of animations all together **/
+    private class SyncAnimator {
+        private var animator: AnimatorSet = AnimatorSet()
+        private var callbackJob: Job? = null
 
-        override fun onAnimationEnd(animation: Animator?) {
-            callback()
+        fun play(animations: List<Animator>, callback: (() -> Unit)? = null) {
+            runOnUiThread {
+                stop()
+                animator.playTogether(animations)
+                val callbackDelay = animator.totalDuration
+                callback?.let {
+                    callbackJob = GlobalScope.launch {
+                        delay(timeMillis = callbackDelay)
+                        it()
+                    }
+                }
+                animator.start()
+            }
         }
 
-        override fun onAnimationStart(animation: Animator?) {}
-
-        override fun onAnimationCancel(animation: Animator?) {}
-
-        override fun onAnimationRepeat(animation: Animator?) {}
+        fun stop() {
+            runOnUiThread {
+                callbackJob?.cancel()
+                animator.cancel()
+                animator = AnimatorSet()
+            }
+        }
     }
 }
