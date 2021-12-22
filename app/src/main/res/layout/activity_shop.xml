@@ -5,7 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    tools:context=".ShopActivity">
+    tools:context=".ShopActivity"
+    tools:visibility="visible">
 
     <org.mozilla.geckoview.GeckoView
         android:id="@+id/web_view"
@@ -20,6 +21,7 @@
         android:id="@+id/menu_layout"
         android:layout_width="match_parent"
         android:layout_height="48dp"
+        android:background="#000000"
         android:orientation="horizontal"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
