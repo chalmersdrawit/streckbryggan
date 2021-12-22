@@ -49,7 +49,7 @@ class StrecklistanPoller(
         pollStartedAt = Instant.now()
         val requestId = sessionId
         pollRequest =
-            connection.pollTransaction { result: Result<TransactionPollResponse, FuelError> ->
+            connection.pollTransaction(10000) { result: Result<TransactionPollResponse, FuelError> ->
                 runOnUiThread {
                     if (requestId == sessionId && !canceled) {
                         pollRequest = null

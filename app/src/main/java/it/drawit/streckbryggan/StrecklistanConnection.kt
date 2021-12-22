@@ -74,13 +74,21 @@ class StrecklistanConnection(
 ) {
     private val mapper = jacksonObjectMapper()
     private val pollUri = "$strecklistanBaseUri/api/izettle/bridge/poll"
+    private val pollUriTimeout = { timeout: Int -> "$pollUri?timeout=$timeout" }
     private val postUri =
         { reference: Int -> "$strecklistanBaseUri/api/izettle/bridge/payment_response/$reference" }
 
-    fun pollTransaction(callback: (s: Result<TransactionPollResponse, FuelError>) -> Unit): CancellableRequest {
-        return Fuel.get(pollUri)
+    fun pollTransaction(timeout_millis: Int? = null, callback: (s: Result<TransactionPollResponse, FuelError>) -> Unit): CancellableRequest {
+        var uri = pollUri
+        var httpTimeout = 3000
+        timeout_millis?.let {
+            uri = pollUriTimeout(it)
+            httpTimeout += it
+        }
+
+        return Fuel.get(uri)
             .authentication().basic(strecklistanUser, strecklistanPass)
-            .timeout(15000)
+            .timeout(httpTimeout)
             .response { _, _, result ->
                 when (result) {
                     is Result.Success -> {
