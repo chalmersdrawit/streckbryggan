@@ -31,7 +31,12 @@ sealed class TransactionOver {
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("TransactionPaid")
-    object TransactionPaid : TransactionOver()
+    data class TransactionPaid(
+        val card_type: String?,
+        val card_payment_entry_mode: String?,
+        val card_issuing_bank: String?,
+        val masked_pan: String?,
+    ) : TransactionOver()
 
     @JsonInclude(JsonInclude.Include.NON_NULL)
     @JsonTypeName("TransactionFailed")
@@ -78,7 +83,10 @@ class StrecklistanConnection(
     private val postUri =
         { reference: Int -> "$strecklistanBaseUri/api/izettle/bridge/payment_response/$reference" }
 
-    fun pollTransaction(timeout_millis: Int? = null, callback: (s: Result<TransactionPollResponse, FuelError>) -> Unit): CancellableRequest {
+    fun pollTransaction(
+        timeout_millis: Int? = null,
+        callback: (s: Result<TransactionPollResponse, FuelError>) -> Unit
+    ): CancellableRequest {
         var uri = pollUri
         var httpTimeout = 3000
         timeout_millis?.let {
@@ -114,7 +122,12 @@ class StrecklistanConnection(
                 //if (BuildConfig.DEBUG && reference != reference2) {
                 //    error("Assertion failed: Transaction reference mismatch")
                 //}
-                TransactionOver.TransactionPaid
+                TransactionOver.TransactionPaid(
+                    card_type = result.payload.cardType,
+                    card_issuing_bank = result.payload.cardIssuingBank,
+                    card_payment_entry_mode = result.payload.cardPaymentEntryMode,
+                    masked_pan = result.payload.maskedPan,
+                )
             }
             is CardPaymentResult.Canceled -> {
                 TransactionOver.TransactionCancelled

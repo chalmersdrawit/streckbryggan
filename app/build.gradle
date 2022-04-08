@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         applicationId "it.drawit.streckbryggan"
-        minSdkVersion 26
+        minSdkVersion 21
         targetSdkVersion 30
         versionCode versionMajor * 10000
                   + versionMinor * 100
