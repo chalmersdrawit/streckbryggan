@@ -40,14 +40,14 @@ class PulseIndicator() {
         val animations = ArrayList<Animator>()
         prepareAnimation(animations, PulseRing.Inner, PulseDir.SHRINK)
         prepareAnimation(animations, PulseRing.Outer, PulseDir.GROW)
-        animator.play(animations) { breatheOut() }
+        animator.play(animations, animDuration(PulseDir.GROW)) { breatheOut() }
     }
 
     private fun breatheOut() {
         val animations = ArrayList<Animator>()
         prepareAnimation(animations, PulseRing.Inner, PulseDir.GROW)
         prepareAnimation(animations, PulseRing.Outer, PulseDir.SHRINK)
-        animator.play(animations) { breatheIn() }
+        animator.play(animations, animDuration(PulseDir.GROW)) { breatheIn() }
 
     }
 
@@ -55,7 +55,7 @@ class PulseIndicator() {
         val animations = ArrayList<Animator>()
         prepareAnimation(animations, PulseRing.Inner, PulseDir.NEUTRAL)
         prepareAnimation(animations, PulseRing.Outer, PulseDir.NEUTRAL)
-        animator.play(animations)
+        animator.play(animations, animDuration(PulseDir.NEUTRAL))
     }
 
     private fun prepareAnimation(
@@ -113,14 +113,13 @@ class PulseIndicator() {
         private var animator: AnimatorSet = AnimatorSet()
         private var callbackJob: Job? = null
 
-        fun play(animations: List<Animator>, callback: (() -> Unit)? = null) {
+        fun play(animations: List<Animator>, duration: Long, callback: (() -> Unit)? = null) {
             runOnUiThread {
                 stop()
                 animator.playTogether(animations)
-                val callbackDelay = animator.totalDuration
                 callback?.let {
                     callbackJob = GlobalScope.launch {
-                        delay(timeMillis = callbackDelay)
+                        delay(timeMillis = duration)
                         it()
                     }
                 }

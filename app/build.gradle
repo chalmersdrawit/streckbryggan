@@ -73,4 +73,5 @@ dependencies {
     implementation "com.fasterxml.jackson.module:jackson-module-kotlin:2.11.2"
     implementation "androidx.work:work-runtime-ktx:$work_version"
     implementation "org.mozilla.geckoview:geckoview:92.0.20210903235534"
+    implementation 'com.jakewharton.threetenabp:threetenabp:1.4.0'
 }

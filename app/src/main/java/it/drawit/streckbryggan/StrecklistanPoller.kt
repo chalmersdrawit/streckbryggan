@@ -8,8 +8,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.mozilla.gecko.util.ThreadUtils.runOnUiThread
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import org.threeten.bp.Instant
+import org.threeten.bp.temporal.ChronoUnit
 
 class StrecklistanPoller(
     val connection: StrecklistanConnection,
